@@ -1,0 +1,7 @@
+{
+    "name": "monorepo_handson",
+    "private": true,
+    "workspaces": [
+        "apps/*"
+    ]
+}
