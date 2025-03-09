@@ -1,9 +1,16 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import postgres from 'postgres'
+import {drizzle} from "drizzle-orm/postgres-js"
 import { z } from 'zod'
+import { todosTable } from './db/schema'
 
-const app = new Hono()
+export type Env = {
+  DATABASE_URL: string
+}
+
+const app = new Hono<{Bindings: Env}>()
 
 // frontendからAPIを使用できるように、CORSを許可する
 app.use('*', cors({
@@ -25,9 +32,22 @@ const route = app
       return c.text(result.error.issues[0].message, 400)
     }
   }),
-  (c) => {
+  async (c) => {
     const {title, description} = c.req.valid('json')
-    return c.json({title, description})
+    const client = postgres(c.env.DATABASE_URL, {prepare: false})
+    const db = drizzle({client})
+    const todo = await db.insert(todosTable).values({title, description}).returning()
+    return c.json({todo: todo[0]})
+  })
+
+  .get('/todos', async (c) => {
+    const client = postgres(c.env.DATABASE_URL, {prepare: false})
+    const db = drizzle({client})
+    const todos = await db.select().from(todosTable)
+    if (!todos) {
+      return c.text('Failed to fetch todos', 500)
+    }
+    return c.json({todos})
   })
 
 export type AppType = typeof route
